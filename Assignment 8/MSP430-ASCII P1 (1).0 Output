@@ -1,0 +1,69 @@
+
+/********************************************
+Digital Communications & Transmissions
+
+               LAB 8 
+
+            Year: 2026
+
+            Semester 3
+            
+******************************************/
+#include <msp430.h> 
+
+
+#define TX_PIN BIT0         // P1.0 as TX
+#define STATUS_PIN BIT0     // P2.0 as TX
+#define BAUD_RATE 9600      //BaudRate
+#define BIT_DELAY (100000 / BAUD_RATE)  // crude delay in microseconds, adjust for your clock
+
+void uart_bitbang_send(char c);
+void delay_us(unsigned int us);
+
+int main(void) {
+    WDTCTL = WDTPW | WDTHOLD;   // Stop watchdog timer
+    BCSCTL1 = CALBC1_1MHZ;      // Set DCO to 1 MHz
+    DCOCTL = CALDCO_1MHZ;
+
+    P1DIR |= TX_PIN;             // Set TX_PIN as output
+    P1OUT |= TX_PIN;             // Idle high
+    P2DIR |= STATUS_PIN;         // Set status as output
+    P2OUT  &= ~STATUS_PIN;        // Idle LOW
+
+    __enable_interrupt();        // Enable global interrupts if needed
+
+    while (1) {
+        uart_bitbang_send('B');  // send character 'B'
+        delay_us(1000000);       // 1 second delay
+    }
+}
+
+void uart_bitbang_send(char c) {
+    unsigned char i;
+
+    // Start bit
+    delay_us(BIT_DELAY);
+    P2OUT |= STATUS_PIN; //Make low
+
+    // Data bits (LSB first) BIT BANG
+    for (i = 0; i < 8; i++) {
+        if (c & 0x80) {
+            P1OUT |= TX_PIN;
+        } else {
+            P1OUT &= ~TX_PIN;
+        }
+        c <<= 1;
+        delay_us(1);
+    }
+
+    P2OUT &= ~ STATUS_PIN;
+    P1OUT &= ~TX_PIN;  //Make low
+    delay_us(BIT_DELAY);
+}
+
+// Simple delay loop (~1 us per iteration at 1 MHz, approximate)
+void delay_us(unsigned int us) {
+    while (us--) {
+        __delay_cycles(1);  // adjust depending on CPU speed
+    }
+}
